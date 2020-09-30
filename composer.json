@@ -1,7 +1,9 @@
 {
     "name": "haris/laravel-payeer",
     "description": "Payeer payments for Laravel",
+    "keywords": ["payeer", "laravel"],
     "license": "MIT",
+    "homepage": "https://github.com/HarisUa/laravel-payeer",
     "authors": [
         {
             "name": "Integer",
