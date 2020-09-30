@@ -1,0 +1,35 @@
+{
+    "name": "haris/laravel-payeer",
+    "description": "Payeer payments for Laravel",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Integer",
+            "email": "blissgameryt@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.2.5",
+        "laravel/framework": "7.*",
+        "guzzlehttp/guzzle": "6.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Haris\\Payeer\\Facades\\": "src/Facades",
+            "Haris\\Payeer\\": "src"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Haris\\Payeer\\PayeerServiceProvider"
+            ],
+            "aliases": {
+                "Payeer": "Haris\\Payeer\\Facades\\Payeer"
+            }
+        }
+    }
+}
