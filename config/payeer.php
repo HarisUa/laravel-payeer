@@ -14,13 +14,18 @@ return [
     /**
      * Search order in the database and return order details
      */
-    'searchOrder' => null, //  'App\Http\Controllers\PayeerController@paidOrder',
+    'searchOrder' => null, //  'App\Http\Controllers\PayeerController@searchOrder',
 
     /**
      * If current status != paid then call PaidOrderFilter
      * update order into DB & other actions
      */
     'paidOrder' => null, //  'App\Http\Controllers\PayeerController@paidOrder',
+
+    /**
+     * Default currency for payments
+     */
+    'currency' => 'USD',
 
     /**
      * Allowed IP's
@@ -34,5 +39,10 @@ return [
     /**
      * Allow local?
      */
-    'locale' => true
+    'locale' => true,
+
+    /**
+     * Payeer merchant URL
+     */
+    'url' => 'https://payeer.com/merchant/'
 ];

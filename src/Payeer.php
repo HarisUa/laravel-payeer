@@ -10,6 +10,34 @@ use Illuminate\Support\Facades\Validator;
 
 class Payeer
 {
+    const HANDLE_PARAMS = [
+        'm_operation_id',
+        'm_operation_ps',
+        'm_operation_date',
+        'm_operation_pay_date',
+        'm_shop',
+        'm_orderid',
+        'm_amount',
+        'm_curr',
+        'm_desc',
+        'm_status'
+    ];
+
+    const REQUEST_PARAMS = [
+        'm_shop',
+        'm_orderid',
+        'm_amount',
+        'm_curr',
+        'm_desc'
+    ];
+
+    const HANDLE_TYPE = 'handle';
+    const REQUEST_TYPE = 'request';
+    const TYPES = [ 
+        self::HANDLE_TYPE => self::HANDLE_PARAMS,
+        self::REQUEST_TYPE => self::REQUEST_PARAMS
+    ];
+
     public function __construct()
     {
         //
@@ -26,8 +54,8 @@ class Payeer
             'm_orderid' => 'required',
             'm_amount' => 'required',
             'm_curr' => 'required',
-            'm_desc' => 'required',
-            'm_status' => 'required,in:success',
+            'm_desc' => 'string|nullable',
+            'm_status' => 'required|in:success',
             'm_sign' => 'required'
         ]);
 
@@ -40,13 +68,9 @@ class Payeer
 
     public function validateSignature(Request $request)
     {
-        $sign = $this->getSignature($request);
-
-        if ($request->get('m_sign') != $sign) {
-            return false;
-        }
-
-        return true;
+        $sign = $this->getSignature(self::HANDLE_TYPE, $request);
+        if (!$sign) return false;
+        return $request->get('m_sign') == $sign;
     }
 
     public function allowIP($ip)
@@ -58,31 +82,46 @@ class Payeer
         return in_array($ip, config('payeer.allowed_ips'));
     }
 
-    public function getSignature(Request $request)
+    public function handleTypeSignature(array &$hash, Request $request)
     {
-        $key = config('payeer.secret_key');
 
-        $hash = array(
-            $request->get('m_operation_id'),
-            $request->get('m_operation_ps'),
-            $request->get('m_operation_date'),
-            $request->get('m_operation_pay_date'),
-            $request->get('m_shop'),
-            $request->get('m_orderid'),
-            $request->get('m_amount'),
-            $request->get('m_curr'),
-            $request->get('m_desc'),
-            $request->get('m_status')
-        );
+    }
 
+    public function requestTypeSignature(array &$hash, Request $request)
+    {
         if ($request->has('m_params'))
         {
             $hash[] = $request->get('m_params');
         }
+    }
+
+    public function getSignature($type, Request $request)
+    {
+        $key = config('payeer.secret_key');
+
+        if (!array_key_exists($type, self::TYPES)) return null;
+
+        $hash = $request->only(self::TYPES[$type]);
+
+        $method = $type . 'TypeSignature';
+        if (method_exists($this, $method))$this->$method($hash, $request);
 
         $hash[] = $key;
-
         return strtoupper(hash('sha256', implode(':', $hash)));
+    }
+
+    public function getRedirectPaymentUrl($m_orderid, $amount, $description = '', $curr = null)
+    {
+        $m_shop = config('payeer.merchant_id');
+        $m_amount = number_format($amount, 2, '.', '');
+        $m_desc = base64_encode($description);
+        $m_curr = $curr ?? config('payeer.currency');
+        $m_key = config('payeer.secret_key');
+        
+        $params = collect(self::TYPES[self::REQUEST_TYPE]);
+        $request = new \Illuminate\Http\Request(compact($params->all()));
+        $m_sign = $this->getSignature(self::REQUEST_TYPE, $request);
+        return config('payeer.url') . '?' . http_build_query(compact($params->except('m_key')->push('m_sign')->toArray()));
     }
 
     public function handle(Request $request)
@@ -94,7 +133,7 @@ class Payeer
         $order = $this->callSearchOrder($request);
         if (!$order) return $this->responseError($request->get('m_orderid'));
 
-        if (Str::lower($order['_orderStatus']) === 'paid') return $this->responseOK($request->get('m_orderid'));
+        if (Str::lower($order['status']) === 'paid') return $this->responseOK($request->get('m_orderid'));
         if (! $this->callPaidOrder($request, $order)) return $this->responseError($request->get('m_orderid'));
         return $this->responseOK($request->get('m_orderid'));
     }
@@ -108,22 +147,22 @@ class Payeer
         return App::call(config('payeer.searchOrder'), ['order_id' => $request->input('m_orderid')]);
     }
 
-    public function callPaidOrder($order)
+    public function callPaidOrder($request, $order)
     {
         if (is_null(config('payeer.paidOrder'))) {
             throw new Exception("Paid order handler not found", 500);
         }
 
-        return App::call(config('payeer.paidOrder'), ['order' => $order]);
+        return App::call(config('payeer.paidOrder'), ['request' => $request, 'order' => $order]);
     }
 
     public function responseError($orderid)
     {
-        return $orderid.'|success';
+        return $orderid.'|error';
     }
 
     public function responseOK($orderid)
     {
-        return $orderid.'|error';
+        return $orderid.'|success';
     }
 }
